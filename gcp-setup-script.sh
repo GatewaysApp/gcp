@@ -89,4 +89,4 @@ echo "⚠️  Keep the service account key secure and never commit it to version
 echo ""
 echo ""
 echo ""
-cat KEY_FILE
+cat $KEY_FILE
