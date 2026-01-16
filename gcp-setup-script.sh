@@ -86,3 +86,7 @@ echo "  3. Use the project ID and service account key JSON in the complete endpo
 echo "     POST /api/cloud-connections/:workspaceSlug/:connectionId/complete"
 echo ""
 echo "⚠️  Keep the service account key secure and never commit it to version control!"
+echo ""
+echo ""
+echo ""
+cat KEY_FILE
