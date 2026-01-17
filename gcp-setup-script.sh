@@ -77,16 +77,38 @@ echo ""
 echo "📋 Connection Details:"
 echo "  Project ID: $PROJECT_ID"
 echo "  Service Account Email: $SERVICE_ACCOUNT_EMAIL"
-echo "  Key File: $KEY_FILE"
 echo ""
-echo "📤 Next Steps:"
-echo "  1. The service account key has been saved to: $KEY_FILE"
-echo "  2. Download this file (if running in Cloud Shell, use the download button or 'cloudshell download $KEY_FILE')"
-echo "  3. Use the project ID and service account key JSON in the complete endpoint:"
-echo "     POST /api/cloud-connections/:workspaceSlug/:connectionId/complete"
+
+# Base62 encoding function
+base62_encode() {
+  local input="$1"
+  local base62_chars="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  local result=""
+  
+  # Convert to number (sum of ASCII values)
+  local num=0
+  for (( i=0; i<${#input}; i++ )); do
+    num=$((num * 256 + $(printf '%d' "'${input:$i:1}")))
+  done
+  
+  # Convert to base62
+  while [ $num -gt 0 ]; do
+    result="${base62_chars:$((num % 62)):1}$result"
+    num=$((num / 62))
+  done
+  
+  # Handle empty string
+  [ -z "$result" ] && result="0"
+  echo "$result"
+}
+
+# Read KEY_FILE content and encode to base62
+KEY_FILE_CONTENT=$(cat "$KEY_FILE")
+KEY_FILE_BASE62=$(base62_encode "$KEY_FILE_CONTENT")
+echo "🔐 Key File (Base62 Encoded):"
+echo "$KEY_FILE_BASE62"
+
+# Delete the KEY_FILE
+rm -f "$KEY_FILE"
 echo ""
 echo "⚠️  Keep the service account key secure and never commit it to version control!"
-echo ""
-echo ""
-echo ""
-cat $KEY_FILE
