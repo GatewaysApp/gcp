@@ -84,9 +84,9 @@ base62_encode() {
   local input="$1"
   
   # Use Python for proper base62 encoding (available in Cloud Shell)
-  python3 -c "
+  # Handle large strings by reading from stdin to avoid command line length limits
+  echo "$input" | python3 -c "
 import sys
-import base64
 
 def base62_encode(data):
     \"\"\"Encode bytes to base62 string.\"\"\"
@@ -110,16 +110,70 @@ def base62_encode(data):
     
     return result
 
-# Read input from command line
-input_str = sys.argv[1]
+# Read input from stdin
+input_str = sys.stdin.read()
 encoded = base62_encode(input_str)
 print(encoded)
-" "$input"
+"
+}
+
+# Base62 decoding function for verification
+base62_decode() {
+  local encoded="$1"
+  
+  echo "$encoded" | python3 -c "
+import sys
+
+def base62_decode(encoded):
+    \"\"\"Decode base62 string back to bytes.\"\"\"
+    chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    num = 0
+    
+    for char in encoded:
+        if char not in chars:
+            raise ValueError(f'Invalid base62 character: {char}')
+        num = num * 62 + chars.index(char)
+    
+    # Convert integer back to bytes
+    if num == 0:
+        return b''
+    
+    byte_length = (num.bit_length() + 7) // 8
+    bytes_list = []
+    temp = num
+    for _ in range(byte_length):
+        bytes_list.insert(0, temp & 0xff)
+        temp >>= 8
+    
+    # Convert bytes to string
+    return bytes(bytes_list).decode('utf-8')
+
+# Read encoded string from stdin
+encoded_str = sys.stdin.read().strip()
+try:
+    decoded = base62_decode(encoded_str)
+    print(decoded)
+except Exception as e:
+    print(f'ERROR: {str(e)}', file=sys.stderr)
+    sys.exit(1)
+"
 }
 
 # Read KEY_FILE content and encode to base62
 KEY_FILE_CONTENT=$(cat "$KEY_FILE")
 KEY_FILE_BASE62=$(base62_encode "$KEY_FILE_CONTENT")
+
+# Verify encoding/decoding works correctly
+echo ""
+echo "🔍 Verifying base62 encoding..."
+DECODED_VERIFY=$(echo "$KEY_FILE_BASE62" | base62_decode)
+if [ "$DECODED_VERIFY" = "$KEY_FILE_CONTENT" ]; then
+  echo "✅ Base62 encoding verification successful"
+else
+  echo "❌ Base62 encoding verification failed!"
+  echo "⚠️  Warning: Encoded key may not decode correctly. Please check the encoding function."
+fi
+
 echo ""
 echo "🔐 Key File (Base62 Encoded): Copy this and provide in 'Service Account Key' field to complete cloud connection"
 echo "$KEY_FILE_BASE62"
