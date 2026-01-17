@@ -32,6 +32,7 @@ APIS=(
   "sqladmin.googleapis.com"          # Cloud SQL Admin API (for databases)
   "dns.googleapis.com"               # Cloud DNS API (for DNS management)
   "cloudfunctions.googleapis.com"    # Cloud Functions API (for serverless functions)
+  "cloudbuild.googleapis.com"        # Cloud Build API (required for Cloud Functions deployment)
   "run.googleapis.com"               # Cloud Run API (for containerized applications)
   "secretmanager.googleapis.com"     # Secret Manager API (for secrets)
 )
