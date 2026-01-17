@@ -66,10 +66,55 @@ echo ""
 
 # Create and download service account key
 echo "🔑 Creating service account key..."
+
+# Check if service account has maximum keys (10 is the limit)
+KEY_COUNT=$(gcloud iam service-accounts keys list --iam-account="$SERVICE_ACCOUNT_EMAIL" --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$KEY_COUNT" -ge 10 ]; then
+  echo "⚠️  Service account has $KEY_COUNT keys (maximum is 10). Deleting oldest keys..."
+  
+  # Get list of keys sorted by creation time (oldest first) and delete oldest ones
+  # Keep only the 8 most recent keys to make room for new one
+  KEYS_TO_DELETE=$(gcloud iam service-accounts keys list \
+    --iam-account="$SERVICE_ACCOUNT_EMAIL" \
+    --format="value(name)" \
+    --sort-by=~validAfterTime 2>/dev/null | tail -n +9)
+  
+  if [ -n "$KEYS_TO_DELETE" ]; then
+    echo "$KEYS_TO_DELETE" | while read -r key_id; do
+      if [ -n "$key_id" ]; then
+        echo "  - Deleting old key: $key_id"
+        gcloud iam service-accounts keys delete "$key_id" \
+          --iam-account="$SERVICE_ACCOUNT_EMAIL" \
+          --quiet 2>/dev/null || true
+      fi
+    done
+  fi
+  
+  # Wait a moment for deletion to propagate
+  sleep 2
+fi
+
+# If service account was just created, wait a moment for it to propagate
+if [ "$KEY_COUNT" -eq 0 ]; then
+  echo "⏳ Waiting for service account to propagate..."
+  sleep 3
+fi
+
 KEY_FILE="deplo-service-account-key-$(date +%s).json"
 gcloud iam service-accounts keys create "$KEY_FILE" \
   --iam-account="$SERVICE_ACCOUNT_EMAIL" \
   --format=json
+
+# Check if key creation was successful
+if [ ! -f "$KEY_FILE" ] || [ ! -s "$KEY_FILE" ]; then
+  echo "❌ Error: Failed to create service account key"
+  echo "Please check:"
+  echo "  1. The service account exists: $SERVICE_ACCOUNT_EMAIL"
+  echo "  2. You have permissions to create service account keys"
+  echo "  3. The service account doesn't have 10 keys already (maximum limit)"
+  exit 1
+fi
 
 echo ""
 echo "✅ Setup completed successfully!"
@@ -83,9 +128,15 @@ echo ""
 base62_encode() {
   local input="$1"
   
+  # Check if input is provided
+  if [ -z "$input" ]; then
+    echo "ERROR: Empty input to base62_encode" >&2
+    return 1
+  fi
+  
   # Use Python for proper base62 encoding (available in Cloud Shell)
   # Handle large strings by reading from stdin to avoid command line length limits
-  echo "$input" | python3 -c "
+  printf "%s" "$input" | python3 -c "
 import sys
 
 def base62_encode(data):
@@ -112,8 +163,22 @@ input_str = sys.stdin.read()
 # Remove trailing newline only if it exists (preserve actual content)
 if input_str.endswith('\n'):
     input_str = input_str[:-1]
-encoded = base62_encode(input_str)
-print(encoded)
+
+# Check if input is empty
+if not input_str:
+    print('ERROR: Empty input string', file=sys.stderr)
+    sys.exit(1)
+
+try:
+    encoded = base62_encode(input_str)
+    if not encoded:
+        print('ERROR: Encoding produced empty result', file=sys.stderr)
+        sys.exit(1)
+    print(encoded, end='')
+    sys.stdout.flush()
+except Exception as e:
+    print(f'ERROR: {str(e)}', file=sys.stderr)
+    sys.exit(1)
 "
 }
 
@@ -166,12 +231,40 @@ except Exception as e:
 
 # Read KEY_FILE content and encode to base62 (preserve all content)
 KEY_FILE_CONTENT=$(cat "$KEY_FILE")
+
+# Check if KEY_FILE has content
+if [ -z "$KEY_FILE_CONTENT" ]; then
+  echo "❌ Error: Service account key file is empty"
+  echo "Please check that the key file was created successfully: $KEY_FILE"
+  exit 1
+fi
+
+# Encode to base62
+echo "📝 Encoding service account key to base62..."
 KEY_FILE_BASE62=$(base62_encode "$KEY_FILE_CONTENT")
+
+# Check if encoding was successful
+if [ -z "$KEY_FILE_BASE62" ]; then
+  echo "❌ Error: Base62 encoding failed (empty result)"
+  echo "Please check that the key file is valid JSON and encoding function is working"
+  exit 1
+fi
+
+echo "✅ Base62 encoding completed (length: ${#KEY_FILE_BASE62} characters)"
 
 # Verify encoding/decoding works correctly
 echo ""
 echo "🔍 Verifying base62 encoding..."
-DECODED_VERIFY=$(printf "%s" "$KEY_FILE_BASE62" | base62_decode)
+DECODED_VERIFY=$(printf "%s" "$KEY_FILE_BASE62" | base62_decode 2>&1)
+
+# Check if decode had errors
+if [ $? -ne 0 ] || [ -z "$DECODED_VERIFY" ]; then
+  echo "❌ Error: Base62 decoding failed during verification"
+  echo "Decode output: $DECODED_VERIFY"
+  echo "Base62 string length: ${#KEY_FILE_BASE62} characters"
+  echo "Base62 string preview (first 100 chars): ${KEY_FILE_BASE62:0:100}"
+  exit 1
+fi
 
 # Compare using printf to avoid newline issues
 ORIGINAL_HASH=$(printf "%s" "$KEY_FILE_CONTENT" | sha256sum | cut -d' ' -f1)
