@@ -3,7 +3,8 @@
 # This script creates a service account with all necessary IAM roles for Deplo
 # Run this in Google Cloud Shell or locally with gcloud CLI installed
 
-set -e
+# Don't exit on errors - we'll handle them manually
+set +e
 
 # Configuration
 SERVICE_ACCOUNT_ID="deplo-cloud-connection"
@@ -36,39 +37,50 @@ APIS=(
 )
 
 BILLING_REQUIRED=false
+
+# Check which APIs are already enabled to avoid unnecessary attempts
+echo "🔍 Checking currently enabled APIs..."
+ENABLED_APIS=$(gcloud services list --enabled --project="$PROJECT_ID" --format="value(config.name)" 2>/dev/null || echo "")
+
 for API in "${APIS[@]}"; do
   echo "  - Enabling $API..."
-  ERROR_OUTPUT=$(gcloud services enable "$API" --project="$PROJECT_ID" 2>&1)
-  EXIT_CODE=$?
   
   # Check if API is already enabled
-  if gcloud services list --enabled --project="$PROJECT_ID" --filter="config.name:$API" --format="value(config.name)" 2>/dev/null | grep -q "^$API$"; then
-    echo "    ✅ $API enabled"
+  if echo "$ENABLED_APIS" | grep -q "^$API$"; then
+    echo "    ✅ $API already enabled"
     continue
   fi
   
-  # Check for specific error types
-  if echo "$ERROR_OUTPUT" | grep -qi "billing\|BILLING_NOT_OPEN\|UREQ_PROJECT_BILLING_NOT_OPEN"; then
-    echo "    ⚠️  Failed: Billing account not enabled for this project"
-    echo "       Compute Engine API requires billing to be enabled."
-    echo "       Please enable billing at:"
-    echo "       https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
-    BILLING_REQUIRED=true
-  elif echo "$ERROR_OUTPUT" | grep -qi "PERMISSION_DENIED\|access denied\|forbidden"; then
-    echo "    ⚠️  Failed: Insufficient permissions to enable $API"
-    echo "       Please ensure you have 'Service Usage Admin' role or enable it manually:"
-    echo "       https://console.developers.google.com/apis/library/$API?project=$PROJECT_ID"
-  elif [ $EXIT_CODE -eq 0 ]; then
-    # Command succeeded
-    echo "    ✅ $API enabled"
+  # Try to enable the API and capture output
+  OUTPUT=$(gcloud services enable "$API" --project="$PROJECT_ID" 2>&1)
+  EXIT_CODE=$?
+  
+  if [ $EXIT_CODE -eq 0 ]; then
+    # Success - API enabled
+    echo "    ✅ $API enabled successfully"
   else
-    echo "    ⚠️  Failed to enable $API"
-    ERROR_MSG=$(echo "$ERROR_OUTPUT" | grep -i "ERROR:" | head -1 || echo "$ERROR_OUTPUT" | head -1)
-    if [ -n "$ERROR_MSG" ]; then
-      echo "       Error: $ERROR_MSG"
+    # Command failed - check error type
+    if echo "$OUTPUT" | grep -qi "billing\|BILLING_NOT_OPEN\|UREQ_PROJECT_BILLING_NOT_OPEN"; then
+      echo "    ⚠️  Failed: Billing account not enabled for this project"
+      echo "       Compute Engine API requires billing to be enabled."
+      echo "       Please enable billing at:"
+      echo "       https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT_ID"
+      BILLING_REQUIRED=true
+    elif echo "$OUTPUT" | grep -qi "PERMISSION_DENIED\|access denied\|forbidden"; then
+      echo "    ⚠️  Failed: Insufficient permissions to enable $API"
+      echo "       Please ensure you have 'Service Usage Admin' role or enable it manually:"
+      echo "       https://console.developers.google.com/apis/library/$API?project=$PROJECT_ID"
+    elif echo "$OUTPUT" | grep -qi "already enabled"; then
+      echo "    ✅ $API already enabled"
+    else
+      ERROR_MSG=$(echo "$OUTPUT" | grep -i "ERROR:" | head -1 || echo "$OUTPUT" | head -1)
+      echo "    ⚠️  Failed to enable $API"
+      if [ -n "$ERROR_MSG" ]; then
+        echo "       $ERROR_MSG"
+      fi
+      echo "       You can manually enable it at:"
+      echo "       https://console.developers.google.com/apis/library/$API?project=$PROJECT_ID"
     fi
-    echo "       You can manually enable it at:"
-    echo "       https://console.developers.google.com/apis/library/$API?project=$PROJECT_ID"
   fi
 done
 
