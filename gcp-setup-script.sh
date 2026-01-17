@@ -79,33 +79,49 @@ echo "  Project ID: $PROJECT_ID"
 echo "  Service Account Email: $SERVICE_ACCOUNT_EMAIL"
 echo ""
 
-# Base62 encoding function
+# Base62 encoding function using Python for proper encoding
 base62_encode() {
   local input="$1"
-  local base62_chars="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  local result=""
   
-  # Convert to number (sum of ASCII values)
-  local num=0
-  for (( i=0; i<${#input}; i++ )); do
-    num=$((num * 256 + $(printf '%d' "'${input:$i:1}")))
-  done
-  
-  # Convert to base62
-  while [ $num -gt 0 ]; do
-    result="${base62_chars:$((num % 62)):1}$result"
-    num=$((num / 62))
-  done
-  
-  # Handle empty string
-  [ -z "$result" ] && result="0"
-  echo "$result"
+  # Use Python for proper base62 encoding (available in Cloud Shell)
+  python3 -c "
+import sys
+import base64
+
+def base62_encode(data):
+    \"\"\"Encode bytes to base62 string.\"\"\"
+    chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    
+    # Convert string to bytes
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    
+    # Convert bytes to integer (big-endian)
+    num = int.from_bytes(data, byteorder='big')
+    
+    # Convert integer to base62
+    if num == 0:
+        return '0'
+    
+    result = ''
+    while num > 0:
+        result = chars[num % 62] + result
+        num //= 62
+    
+    return result
+
+# Read input from command line
+input_str = sys.argv[1]
+encoded = base62_encode(input_str)
+print(encoded)
+" "$input"
 }
 
 # Read KEY_FILE content and encode to base62
 KEY_FILE_CONTENT=$(cat "$KEY_FILE")
 KEY_FILE_BASE62=$(base62_encode "$KEY_FILE_CONTENT")
-echo "🔐 Key File (Base62 Encoded):"
+echo ""
+echo "🔐 Key File (Base62 Encoded): Copy this and provide in 'Service Account Key' field to complete cloud connection"
 echo "$KEY_FILE_BASE62"
 
 # Delete the KEY_FILE
