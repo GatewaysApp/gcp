@@ -54,14 +54,35 @@ ROLES=(
 
 for ROLE in "${ROLES[@]}"; do
   echo "  - Granting $ROLE..."
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
     --role="$ROLE" \
     --condition=None \
-    --quiet &>/dev/null || true
+    --quiet 2>&1; then
+    echo "    ✅ $ROLE granted successfully"
+  else
+    echo "    ⚠️  Warning: Failed to grant $ROLE (may already be granted or need manual permission)"
+  fi
 done
 
-echo "✅ All roles granted successfully"
+echo "✅ Role granting completed"
+echo ""
+echo "⏳ Waiting for IAM permissions to propagate (this may take a few seconds)..."
+sleep 5
+
+# Verify that viewer role is granted (required for basic access)
+echo "🔍 Verifying permissions..."
+HAS_VIEWER=$(gcloud projects get-iam-policy "$PROJECT_ID" \
+  --flatten="bindings[].members" \
+  --format="value(bindings.role)" \
+  --filter="bindings.members:serviceAccount:$SERVICE_ACCOUNT_EMAIL AND bindings.role:roles/viewer" 2>/dev/null | head -1)
+
+if [ -z "$HAS_VIEWER" ]; then
+  echo "⚠️  Warning: Viewer role not detected. This may cause permission issues."
+  echo "   Please manually grant 'roles/viewer' to: $SERVICE_ACCOUNT_EMAIL"
+else
+  echo "✅ Viewer role confirmed"
+fi
 echo ""
 
 # Create and download service account key
