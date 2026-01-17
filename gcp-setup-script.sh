@@ -21,6 +21,45 @@ fi
 echo "🔧 Setting up Deplo GCP connection for project: $PROJECT_ID"
 echo ""
 
+# Enable required GCP APIs
+echo "🔌 Enabling required GCP APIs..."
+APIS=(
+  "compute.googleapis.com"           # Compute Engine API (for VMs, firewall rules, networking)
+  "cloudresourcemanager.googleapis.com"  # Cloud Resource Manager API (for project operations)
+  "iam.googleapis.com"               # Identity and Access Management API (for service accounts)
+  "storage.googleapis.com"           # Cloud Storage API (for storage buckets)
+  "sqladmin.googleapis.com"          # Cloud SQL Admin API (for databases)
+  "dns.googleapis.com"               # Cloud DNS API (for DNS management)
+  "cloudfunctions.googleapis.com"    # Cloud Functions API (for serverless functions)
+  "run.googleapis.com"               # Cloud Run API (for containerized applications)
+  "secretmanager.googleapis.com"     # Secret Manager API (for secrets)
+)
+
+for API in "${APIS[@]}"; do
+  echo "  - Enabling $API..."
+  if gcloud services enable "$API" --project="$PROJECT_ID" 2>&1; then
+    echo "    ✅ $API enabled"
+  else
+    ERROR_OUTPUT=$(gcloud services enable "$API" --project="$PROJECT_ID" 2>&1 || true)
+    if echo "$ERROR_OUTPUT" | grep -q "already enabled"; then
+      echo "    ✅ $API already enabled"
+    else
+      echo "    ⚠️  Warning: Failed to enable $API"
+      echo "       This may require billing to be enabled for your project."
+      echo "       If you see errors when creating resources, manually enable it at:"
+      echo "       https://console.developers.google.com/apis/library/$API?project=$PROJECT_ID"
+    fi
+  fi
+done
+
+echo "✅ API enablement completed"
+echo ""
+echo "ℹ️  Note: If any APIs failed to enable, you may need to:"
+echo "   1. Enable billing for your GCP project"
+echo "   2. Wait a few minutes for changes to propagate"
+echo "   3. Manually enable APIs from the links shown above"
+echo ""
+
 # Check if service account already exists
 if gcloud iam service-accounts describe "$SERVICE_ACCOUNT_ID@$PROJECT_ID.iam.gserviceaccount.com" &>/dev/null; then
   echo "⚠️  Service account already exists. Updating roles..."
