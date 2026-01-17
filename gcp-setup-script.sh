@@ -124,112 +124,21 @@ echo "  Project ID: $PROJECT_ID"
 echo "  Service Account Email: $SERVICE_ACCOUNT_EMAIL"
 echo ""
 
-# Base62 encoding function using Python for proper encoding
-base62_encode() {
+# Base64 encoding function
+base64_encode() {
   local input="$1"
   
   # Check if input is provided
   if [ -z "$input" ]; then
-    echo "ERROR: Empty input to base62_encode" >&2
+    echo "ERROR: Empty input to base64_encode" >&2
     return 1
   fi
   
-  # Use Python for proper base62 encoding (available in Cloud Shell)
-  # Handle large strings by reading from stdin to avoid command line length limits
-  printf "%s" "$input" | python3 -c "
-import sys
-
-def base62_encode(data):
-    \"\"\"Encode bytes to base62 string, preserving leading zeros.\"\"\"
-    chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    
-    # Convert string to bytes
-    if isinstance(data, str):
-        data = data.encode('utf-8')
-    
-    # Encode byte by byte to preserve all data including leading zeros
-    result = ''
-    for byte_val in data:
-        # Encode each byte as 2 base62 characters (62^2 = 3844 > 256)
-        # This ensures we can represent all 256 byte values
-        high = byte_val // 62
-        low = byte_val % 62
-        result += chars[high] + chars[low]
-    
-    return result
-
-# Read input from stdin (strip trailing newlines for encoding, but we'll preserve content)
-input_str = sys.stdin.read()
-# Remove trailing newline only if it exists (preserve actual content)
-if input_str.endswith('\n'):
-    input_str = input_str[:-1]
-
-# Check if input is empty
-if not input_str:
-    print('ERROR: Empty input string', file=sys.stderr)
-    sys.exit(1)
-
-try:
-    encoded = base62_encode(input_str)
-    if not encoded:
-        print('ERROR: Encoding produced empty result', file=sys.stderr)
-        sys.exit(1)
-    print(encoded, end='')
-    sys.stdout.flush()
-except Exception as e:
-    print(f'ERROR: {str(e)}', file=sys.stderr)
-    sys.exit(1)
-"
+  # Use base64 command (standard and available everywhere)
+  printf "%s" "$input" | base64 -w 0 2>/dev/null || printf "%s" "$input" | base64
 }
 
-# Base62 decoding function for verification
-base62_decode() {
-  local encoded="$1"
-  
-  echo "$encoded" | python3 -c "
-import sys
-
-def base62_decode(encoded):
-    \"\"\"Decode base62 string back to bytes, preserving leading zeros.\"\"\"
-    chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    
-    # Decode pairs of base62 characters back to bytes
-    if len(encoded) % 2 != 0:
-        raise ValueError('Base62 string length must be even (2 chars per byte)')
-    
-    bytes_list = []
-    for i in range(0, len(encoded), 2):
-        high_char = encoded[i]
-        low_char = encoded[i + 1]
-        
-        if high_char not in chars or low_char not in chars:
-            raise ValueError(f'Invalid base62 character in position {i}')
-        
-        high_val = chars.index(high_char)
-        low_val = chars.index(low_char)
-        byte_val = high_val * 62 + low_val
-        
-        bytes_list.append(byte_val)
-    
-    # Convert bytes to string
-    return bytes(bytes_list).decode('utf-8')
-
-# Read encoded string from stdin (strip only trailing whitespace, preserve actual content)
-encoded_str = sys.stdin.read().rstrip()
-try:
-    if not encoded_str:
-        raise ValueError('Empty base62 string')
-    decoded = base62_decode(encoded_str)
-    # Output without adding extra newline
-    sys.stdout.write(decoded)
-    sys.stdout.flush()
-except Exception as e:
-    print(f'ERROR: {str(e)}', file=sys.stderr)
-    sys.exit(1)
-"
-}
-
-# Read KEY_FILE content and encode to base62 (preserve all content)
+# Read KEY_FILE content and encode to base64
 KEY_FILE_CONTENT=$(cat "$KEY_FILE")
 
 # Check if KEY_FILE has content
@@ -239,70 +148,20 @@ if [ -z "$KEY_FILE_CONTENT" ]; then
   exit 1
 fi
 
-# Encode to base62
-echo "📝 Encoding service account key to base62..."
-KEY_FILE_BASE62=$(base62_encode "$KEY_FILE_CONTENT")
+# Encode to base64
+echo "📝 Encoding service account key to base64..."
+KEY_FILE_BASE64=$(base64_encode "$KEY_FILE_CONTENT")
 
 # Check if encoding was successful
-if [ -z "$KEY_FILE_BASE62" ]; then
-  echo "❌ Error: Base62 encoding failed (empty result)"
-  echo "Please check that the key file is valid JSON and encoding function is working"
+if [ -z "$KEY_FILE_BASE64" ]; then
+  echo "❌ Error: Base64 encoding failed (empty result)"
+  echo "Please check that the key file is valid JSON"
   exit 1
 fi
 
-echo "✅ Base62 encoding completed (length: ${#KEY_FILE_BASE62} characters)"
-
-# Verify encoding/decoding works correctly
 echo ""
-echo "🔍 Verifying base62 encoding..."
-DECODED_VERIFY=$(printf "%s" "$KEY_FILE_BASE62" | base62_decode 2>&1)
-
-# Check if decode had errors
-if [ $? -ne 0 ] || [ -z "$DECODED_VERIFY" ]; then
-  echo "❌ Error: Base62 decoding failed during verification"
-  echo "Decode output: $DECODED_VERIFY"
-  echo "Base62 string length: ${#KEY_FILE_BASE62} characters"
-  echo "Base62 string preview (first 100 chars): ${KEY_FILE_BASE62:0:100}"
-  exit 1
-fi
-
-# Compare using printf to avoid newline issues
-ORIGINAL_HASH=$(printf "%s" "$KEY_FILE_CONTENT" | sha256sum | cut -d' ' -f1)
-DECODED_HASH=$(printf "%s" "$DECODED_VERIFY" | sha256sum | cut -d' ' -f1)
-
-if [ "$ORIGINAL_HASH" = "$DECODED_HASH" ]; then
-  echo "✅ Base62 encoding verification successful"
-else
-  # Debug output to see what's different
-  echo "❌ Base62 encoding verification failed!"
-  echo ""
-  ORIGINAL_LEN=$(printf "%s" "$KEY_FILE_CONTENT" | wc -c)
-  DECODED_LEN=$(printf "%s" "$DECODED_VERIFY" | wc -c)
-  echo "Original length: $ORIGINAL_LEN bytes"
-  echo "Decoded length: $DECODED_LEN bytes"
-  echo ""
-  echo "Original hash: $ORIGINAL_HASH"
-  echo "Decoded hash: $DECODED_HASH"
-  echo ""
-  
-  # Try to find where they differ
-  if [ ${#DECODED_VERIFY} -eq 0 ]; then
-    echo "⚠️  Error: Decoding produced empty result. The base62 string may be invalid."
-    echo "Base62 string length: ${#KEY_FILE_BASE62} characters"
-  else
-    # Show first 200 chars of each for comparison
-    ORIGINAL_PREVIEW=$(printf "%s" "$KEY_FILE_CONTENT" | head -c 200)
-    DECODED_PREVIEW=$(printf "%s" "$DECODED_VERIFY" | head -c 200)
-    echo "Original (first 200 bytes): $ORIGINAL_PREVIEW"
-    echo "Decoded (first 200 bytes): $DECODED_PREVIEW"
-    echo ""
-    echo "⚠️  Warning: Encoded key may not decode correctly. Please check the encoding function."
-  fi
-fi
-
-echo ""
-echo "🔐 Key File (Base62 Encoded): Copy this and provide in 'Service Account Key' field to complete cloud connection"
-echo "$KEY_FILE_BASE62"
+echo "🔐 Key File (Base64 Encoded): Copy this and provide in 'Service Account Key' field to complete cloud connection"
+echo "$KEY_FILE_BASE64"
 
 # Delete the KEY_FILE
 rm -f "$KEY_FILE"
