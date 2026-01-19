@@ -68,6 +68,14 @@ az role assignment create \
 echo "   ✅ Contributor role assigned"
 echo ""
 
+# Register resource providers (required for Storage accounts, NSG/firewalls, etc.)
+echo "📦 Registering resource providers (Microsoft.Storage, Microsoft.Network)..."
+for ns in Microsoft.Storage Microsoft.Network; do
+  az provider register --namespace "$ns" 2>/dev/null || true
+done
+echo "   ✅ Registration requested. If not yet active, it may take 1–2 minutes; the app will retry when you create resources."
+echo ""
+
 # Build JSON output (jq -n --arg properly escapes the secret)
 OUTPUT_JSON=$(jq -n \
   --arg tenantId "$TENANT_ID" \
