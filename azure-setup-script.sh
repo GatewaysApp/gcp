@@ -68,9 +68,9 @@ az role assignment create \
 echo "   ✅ Contributor role assigned"
 echo ""
 
-# Register resource providers (required for Storage, Network, CDN, etc.)
-echo "📦 Registering resource providers (Microsoft.Storage, Microsoft.Network, Microsoft.Cdn)..."
-for ns in Microsoft.Storage Microsoft.Network Microsoft.Cdn; do
+# Register resource providers (required for Storage, Network, CDN, Functions, etc.)
+echo "📦 Registering resource providers (Microsoft.Storage, Microsoft.Network, Microsoft.Cdn, Microsoft.Web)..."
+for ns in Microsoft.Storage Microsoft.Network Microsoft.Cdn Microsoft.Web; do
   az provider register --namespace "$ns" 2>/dev/null || true
 done
 echo "   ✅ Registration requested. If not yet active, it may take 1–2 minutes; the app will retry when you create resources."
