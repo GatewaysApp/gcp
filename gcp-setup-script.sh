@@ -35,6 +35,7 @@ APIS=(
   "cloudbuild.googleapis.com"        # Cloud Build API (required for Cloud Functions deployment)
   "run.googleapis.com"               # Cloud Run API (for containerized applications)
   "secretmanager.googleapis.com"     # Secret Manager API (for secrets)
+  "redis.googleapis.com"             # Memorystore for Redis API (for cache servers)
 )
 
 BILLING_REQUIRED=false
@@ -140,6 +141,7 @@ ROLES=(
   "roles/cloudfunctions.admin"    # Cloud Functions Admin (for serverless functions)
   "roles/run.admin"               # Cloud Run Admin (for containerized applications)
   "roles/secretmanager.admin"     # Secret Manager Admin (for managing secrets)
+  "roles/redis.admin"             # Memorystore for Redis Admin (for cache servers)
 )
 
 for ROLE in "${ROLES[@]}"; do
