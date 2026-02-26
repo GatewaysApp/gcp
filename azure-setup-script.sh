@@ -23,7 +23,7 @@ echo "   Tenant: $TENANT_ID"
 echo ""
 
 # Create App Registration
-APP_NAME="DeploApp-$(date +%s)"
+APP_NAME="GatewaysApp-$(date +%s)"
 echo "📝 Creating App Registration: $APP_NAME..."
 APP_JSON=$(az ad app create --display-name "$APP_NAME" -o json 2>/dev/null) || {
   echo "❌ Failed to create App Registration. Ensure you have permission (e.g. Application Developer or Application.ReadWrite.OwnedBy)."
@@ -66,11 +66,39 @@ az role assignment create \
   exit 1
 }
 echo "   ✅ Contributor role assigned"
+
+# Assign User Access Administrator role (required for managing RBAC role assignments
+# on storage accounts when connecting instances/scalable servers to storage buckets)
+echo "📌 Assigning User Access Administrator role on subscription..."
+az role assignment create \
+  --assignee "$APP_ID" \
+  --role "User Access Administrator" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID" \
+  -o none 2>/dev/null || {
+  echo "⚠️  Warning: Failed to assign User Access Administrator role."
+  echo "   This role is needed for instance ↔ storage bucket connections (managed identity RBAC)."
+  echo "   You can assign it manually or the storage connection feature will fall back to log-only mode."
+}
+echo "   ✅ User Access Administrator role assigned"
 echo ""
 
-# Register resource providers (required for Storage, Network, CDN, Functions, VMs, etc.)
-echo "📦 Registering resource providers (Microsoft.Storage, Microsoft.Network, Microsoft.Cdn, Microsoft.Web, Microsoft.Compute)..."
-for ns in Microsoft.Storage Microsoft.Network Microsoft.Cdn Microsoft.Web Microsoft.Compute; do
+# Register resource providers (required for Storage, Network, CDN, Functions, VMs, Databases, Cache, etc.)
+echo "📦 Registering resource providers..."
+PROVIDERS=(
+  "Microsoft.Compute"            # VMs, VM Scale Sets, Managed Images
+  "Microsoft.Network"            # VNets, NSGs, Application Gateways (LB), Public IPs, DNS Zones
+  "Microsoft.Storage"            # Storage Accounts, Blob Storage
+  "Microsoft.Web"                # App Service, Functions
+  "Microsoft.Cdn"                # Azure Front Door / CDN (origins, endpoints)
+  "Microsoft.DBforMySQL"         # Azure Database for MySQL Flexible Server
+  "Microsoft.DBforPostgreSQL"    # Azure Database for PostgreSQL Flexible Server
+  "Microsoft.Cache"              # Azure Cache for Redis
+  "Microsoft.Dns"                # Azure DNS (zones and record sets)
+  "Microsoft.ManagedIdentity"    # Managed Identities (for VM/VMSS → storage access)
+  "Microsoft.Authorization"      # RBAC Role Assignments (for storage access grants)
+)
+for ns in "${PROVIDERS[@]}"; do
+  echo "   - Registering $ns..."
   az provider register --namespace "$ns" 2>/dev/null || true
 done
 echo "   ✅ Registration requested. If not yet active, it may take 1–2 minutes; the app will retry when you create resources."
