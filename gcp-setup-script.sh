@@ -131,17 +131,17 @@ echo "🔐 Granting IAM roles..."
 
 # Grant roles
 ROLES=(
-  "roles/compute.admin"           # Compute Engine Admin (for VMs, disks, networking)
-  "roles/storage.admin"           # Storage Admin (for Cloud Storage)
-  "roles/cloudsql.admin"          # Cloud SQL Admin (for databases)
+  "roles/compute.admin"           # Compute Engine Admin (VMs, disks, images, instance templates, MIGs, backend services, NEGs, load balancers, CDN backend buckets, SSL certs, golden image deployment)
+  "roles/storage.admin"           # Storage Admin (Cloud Storage buckets, objects, and bucket IAM policies for instance/scalable-server ↔ storage connections)
+  "roles/cloudsql.admin"          # Cloud SQL Admin (databases, authorized networks for instance/function/scalable-server ↔ database connections)
   "roles/iam.serviceAccountUser"  # Service Account User (to impersonate service accounts)
-  "roles/compute.networkAdmin"    # Network Admin (for VPC, firewall rules, load balancers)
+  "roles/compute.networkAdmin"    # Network Admin (VPC, firewall rules, network connections between resources)
   "roles/viewer"                  # Project Viewer (for reading project information)
-  "roles/dns.admin"               # DNS Admin (for managing DNS zones and records)
+  "roles/dns.admin"               # DNS Admin (Cloud DNS zones and records for dns ↔ resource connections)
   "roles/cloudfunctions.admin"    # Cloud Functions Admin (for serverless functions)
   "roles/run.admin"               # Cloud Run Admin (for containerized applications)
   "roles/secretmanager.admin"     # Secret Manager Admin (for managing secrets)
-  "roles/redis.admin"             # Memorystore for Redis Admin (for cache servers)
+  "roles/redis.admin"             # Memorystore for Redis Admin (cache servers, scalable server → cache connections)
 )
 
 for ROLE in "${ROLES[@]}"; do
