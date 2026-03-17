@@ -8,6 +8,15 @@ set -e
 echo "🔧 Gateways GCP Setup (Workload Identity Federation) - starting..."
 echo ""
 
+# Check gcloud auth (common in Cloud Shell when opened from a repo - no account selected)
+ACTIVE_ACCOUNT=$(gcloud config get-value account 2>/dev/null) || true
+if [ -z "$ACTIVE_ACCOUNT" ] || [ "$ACTIVE_ACCOUNT" = "(unset)" ]; then
+  echo "❌ Error: No active gcloud account selected."
+  echo "   Run: gcloud auth login"
+  echo "   Then re-run this script."
+  exit 1
+fi
+
 # Configuration
 SERVICE_ACCOUNT_ID="gateways-cloud-connection"
 SERVICE_ACCOUNT_NAME="Gateways Cloud Connection Service Account"
