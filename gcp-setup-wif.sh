@@ -5,6 +5,9 @@
 
 set -e
 
+echo "🔧 Gateways GCP Setup (Workload Identity Federation) - starting..."
+echo ""
+
 # Configuration
 SERVICE_ACCOUNT_ID="gateways-cloud-connection"
 SERVICE_ACCOUNT_NAME="Gateways Cloud Connection Service Account"
@@ -15,15 +18,15 @@ PROVIDER_ID="gateways-oidc"
 # Gateways OIDC issuer URL - must be HTTPS, no trailing slash. Set via env or prompt.
 GCP_OIDC_ISSUER_URL="${GCP_OIDC_ISSUER_URL:-}"
 
-# Get current project
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+# Get current project (|| true prevents set -e from exiting silently on gcloud failure)
+PROJECT_ID=$(gcloud config get-value project 2>/dev/null) || true
 if [ -z "$PROJECT_ID" ]; then
   echo "❌ Error: No GCP project selected. Run: gcloud config set project YOUR_PROJECT_ID"
   exit 1
 fi
 
 # Get project number (required for WIF)
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null)
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null) || true
 if [ -z "$PROJECT_NUMBER" ]; then
   echo "❌ Error: Could not get project number for $PROJECT_ID"
   exit 1
@@ -33,15 +36,20 @@ echo "🔧 Gateways GCP Setup (Workload Identity Federation)"
 echo "   Project: $PROJECT_ID (number: $PROJECT_NUMBER)"
 echo ""
 
-# Require OIDC issuer URL
+# Require OIDC issuer URL (cannot prompt when piped: curl ... | bash)
 if [ -z "$GCP_OIDC_ISSUER_URL" ]; then
   echo "⚠️  GCP_OIDC_ISSUER_URL is not set."
-  echo "   Set it to your Gateways API base URL (HTTPS, no trailing slash)."
-  echo "   Example: export GCP_OIDC_ISSUER_URL=https://api.gateways.app"
+  echo "   Set it to your Gateways API base URL (HTTPS, no trailing slash) before running."
   echo ""
-  read -p "Enter Gateways OIDC Issuer URL (e.g. https://api.gateways.app): " GCP_OIDC_ISSUER_URL
+  echo "   Example:"
+  echo "     export GCP_OIDC_ISSUER_URL=https://api.gateways.app"
+  echo "     curl -sSL https://raw.githubusercontent.com/GatewaysApp/gcp/main/gcp-setup-wif.sh | bash"
+  echo ""
+  if [ -t 0 ]; then
+    read -p "Enter Gateways OIDC Issuer URL (e.g. https://api.gateways.app): " GCP_OIDC_ISSUER_URL
+  fi
   if [ -z "$GCP_OIDC_ISSUER_URL" ]; then
-    echo "❌ OIDC issuer URL is required."
+    echo "❌ OIDC issuer URL is required. Run: export GCP_OIDC_ISSUER_URL=https://api.gateways.app"
     exit 1
   fi
 fi
