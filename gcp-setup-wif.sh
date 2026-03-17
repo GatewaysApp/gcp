@@ -25,10 +25,23 @@ if [ -z "$PROJECT_ID" ]; then
   exit 1
 fi
 
+# Ensure Cloud Resource Manager API is enabled (needed for projects describe)
+gcloud services enable cloudresourcemanager.googleapis.com --project="$PROJECT_ID" 2>/dev/null || true
+
 # Get project number (required for WIF)
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>/dev/null) || true
-if [ -z "$PROJECT_NUMBER" ]; then
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)" 2>&1) || true
+if [ -z "$PROJECT_NUMBER" ] || ! [[ "$PROJECT_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "❌ Error: Could not get project number for $PROJECT_ID"
+  echo "   Run manually to see the error:"
+  echo "   gcloud projects describe $PROJECT_ID --format=\"value(projectNumber)\""
+  echo ""
+  echo "   Common fixes:"
+  echo "   - Enable API: gcloud services enable cloudresourcemanager.googleapis.com --project=$PROJECT_ID"
+  echo "   - Ensure you have access (roles/viewer or higher on the project)"
+  if [ -n "$PROJECT_NUMBER" ]; then
+    echo ""
+    echo "   gcloud output: $PROJECT_NUMBER"
+  fi
   exit 1
 fi
 
