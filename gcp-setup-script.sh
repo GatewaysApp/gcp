@@ -1,15 +1,15 @@
 #!/bin/bash
-# Deplo GCP Connection Setup Script
-# This script creates a service account with all necessary IAM roles for Deplo
+# Gateways GCP Connection Setup Script
+# This script creates a service account with all necessary IAM roles for Gateways
 # Run this in Google Cloud Shell or locally with gcloud CLI installed
 
 # Don't exit on errors - we'll handle them manually
 set +e
 
 # Configuration
-SERVICE_ACCOUNT_ID="deplo-cloud-connection"
-SERVICE_ACCOUNT_NAME="Deplo Cloud Connection Service Account"
-SERVICE_ACCOUNT_DESCRIPTION="Service account that allows Deplo SaaS platform to deploy and manage resources"
+SERVICE_ACCOUNT_ID="gateways-cloud-connection"
+SERVICE_ACCOUNT_NAME="Gateways Cloud Connection Service Account"
+SERVICE_ACCOUNT_DESCRIPTION="Service account that allows Gateways to deploy and manage GCP resources"
 
 # Get current project ID
 PROJECT_ID=$(gcloud config get-value project)
@@ -214,18 +214,44 @@ if [ "$KEY_COUNT" -eq 0 ]; then
   sleep 3
 fi
 
-KEY_FILE="deplo-service-account-key-$(date +%s).json"
-gcloud iam service-accounts keys create "$KEY_FILE" \
+KEY_FILE="gateways-service-account-key-$(date +%s).json"
+KEY_CREATE_OUTPUT=$(gcloud iam service-accounts keys create "$KEY_FILE" \
   --iam-account="$SERVICE_ACCOUNT_EMAIL" \
-  --format=json
+  --format=json 2>&1)
+KEY_CREATE_EXIT=$?
+
+# Check if key creation failed due to org policy (disableServiceAccountKeyCreation)
+if [ $KEY_CREATE_EXIT -ne 0 ]; then
+  if echo "$KEY_CREATE_OUTPUT" | grep -q "disableServiceAccountKeyCreation"; then
+    echo "❌ Error: Key creation is disabled by your organization's security policy."
+    echo ""
+    echo "Your GCP project/organization has 'iam.disableServiceAccountKeyCreation' enabled."
+    echo "This prevents creating service account keys via gcloud or the Console."
+    echo ""
+    echo "Options to resolve:"
+    echo "  1. Request an exception: Ask your GCP org admin to add an exception for this"
+    echo "     project or service account in IAM & Admin → Organization policies."
+    echo "  2. Create key manually: If you have Console access, try IAM & Admin →"
+    echo "     Service Accounts → $SERVICE_ACCOUNT_EMAIL → Keys → Add key → JSON."
+    echo "     (May also be blocked by the same policy.)"
+    echo "  3. Use a different project: Use a GCP project that does not have this"
+    echo "     constraint (e.g. a personal project) to create the key."
+    echo ""
+    echo "Service account (roles already granted): $SERVICE_ACCOUNT_EMAIL"
+    exit 1
+  fi
+fi
 
 # Check if key creation was successful
 if [ ! -f "$KEY_FILE" ] || [ ! -s "$KEY_FILE" ]; then
   echo "❌ Error: Failed to create service account key"
+  echo "$KEY_CREATE_OUTPUT" | head -20
+  echo ""
   echo "Please check:"
   echo "  1. The service account exists: $SERVICE_ACCOUNT_EMAIL"
   echo "  2. You have permissions to create service account keys"
   echo "  3. The service account doesn't have 10 keys already (maximum limit)"
+  echo "  4. Your org does not block key creation (iam.disableServiceAccountKeyCreation)"
   exit 1
 fi
 
