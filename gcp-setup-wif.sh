@@ -64,11 +64,11 @@ if [ -z "$GCP_OIDC_ISSUER_URL" ]; then
   echo "   Set it to your Gateways API base URL (HTTPS, no trailing slash) before running."
   echo ""
   echo "   Example:"
-  echo "     export GCP_OIDC_ISSUER_URL=https://api.gateways.app"
+  echo "     export GCP_OIDC_ISSUER_URL=https://api.gateways.app/api"
   echo "     curl -sSL https://raw.githubusercontent.com/GatewaysApp/gcp/main/gcp-setup-wif.sh | bash"
   echo ""
   if [ -t 0 ]; then
-    read -p "Enter Gateways OIDC Issuer URL (e.g. https://api.gateways.app): " GCP_OIDC_ISSUER_URL
+    read -p "Enter Gateways OIDC Issuer URL (e.g. https://api.gateways.app/api): " GCP_OIDC_ISSUER_URL
   fi
   if [ -z "$GCP_OIDC_ISSUER_URL" ]; then
     echo "❌ OIDC issuer URL is required. Run: export GCP_OIDC_ISSUER_URL=https://api.gateways.app"
@@ -179,15 +179,22 @@ fi
 echo ""
 
 # Grant pool principal permission to impersonate the service account
-# principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/attribute.sub/CONNECTION_ID
-# We use principalSet with attribute to allow any sub from our IdP - our app controls which connection_id we put in sub
+# principalSet allows any principal from the pool to impersonate the service account
 POOL_PRINCIPAL="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}"
 echo "🔑 Granting pool impersonation permission..."
-gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT_EMAIL" \
+if ! gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT_EMAIL" \
   --project="$PROJECT_ID" \
   --role="roles/iam.workloadIdentityUser" \
   --member="$POOL_PRINCIPAL" \
-  --quiet 2>/dev/null || true
+  --quiet 2>&1; then
+  echo ""
+  echo "⚠️  Failed to add IAM binding. Run this manually (requires Owner or resourcemanager.projects.setIamPolicy):"
+  echo "   gcloud iam service-accounts add-iam-policy-binding $SERVICE_ACCOUNT_EMAIL \\"
+  echo "     --project=$PROJECT_ID \\"
+  echo "     --role=roles/iam.workloadIdentityUser \\"
+  echo "     --member=\"$POOL_PRINCIPAL\""
+  exit 1
+fi
 echo "✅ Impersonation granted"
 echo ""
 
@@ -212,5 +219,5 @@ echo "Base64 (copy paste):"
 echo -n "$WIF_JSON" | base64 | tr -d '\n'
 echo ""
 echo ""
-echo "In Gateways: Connect GCP → Workload Identity Federation → Paste JSON or Base64, or enter values."
+echo "In Gateways: Connect GCP → Workload Identity Federation → Paste the JSON or Base64 above."
 echo ""
