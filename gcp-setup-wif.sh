@@ -179,8 +179,9 @@ fi
 echo ""
 
 # Grant pool principal permission to impersonate the service account
-# principalSet allows any principal from the pool to impersonate the service account
-POOL_PRINCIPAL="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}"
+# principalSet with /* allows any principal from the pool to impersonate the service account
+# See: https://cloud.google.com/iam/docs/principal-identifiers#workload-identity-pool
+POOL_PRINCIPAL="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${POOL_ID}/*"
 echo "🔑 Granting pool impersonation permission..."
 if ! gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT_EMAIL" \
   --project="$PROJECT_ID" \
@@ -192,7 +193,7 @@ if ! gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT_EMAIL"
   echo "   gcloud iam service-accounts add-iam-policy-binding $SERVICE_ACCOUNT_EMAIL \\"
   echo "     --project=$PROJECT_ID \\"
   echo "     --role=roles/iam.workloadIdentityUser \\"
-  echo "     --member=\"$POOL_PRINCIPAL\""
+  echo "     --member='$POOL_PRINCIPAL'"
   exit 1
 fi
 echo "✅ Impersonation granted"
