@@ -133,10 +133,14 @@ ROLES=(
   "roles/certificatemanager.admin"
 )
 for ROLE in "${ROLES[@]}"; do
-  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
     --role="$ROLE" \
-    --quiet 2>/dev/null || true
+    --quiet 2>/dev/null; then
+    echo "  ✅ $ROLE"
+  else
+    echo "  ⚠️  $ROLE (run manually if needed)"
+  fi
 done
 echo "✅ Roles granted"
 echo ""
