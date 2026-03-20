@@ -92,7 +92,7 @@ echo ""
 
 # Enable APIs
 echo "🔌 Enabling APIs..."
-for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com; do
+for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com certificatemanager.googleapis.com; do
   if gcloud services enable "$API" --project="$PROJECT_ID" 2>/dev/null; then
     echo "  ✅ $API"
   else
@@ -130,6 +130,7 @@ ROLES=(
   "roles/run.admin"
   "roles/secretmanager.admin"
   "roles/redis.admin"
+  "roles/certificatemanager.admin"
 )
 for ROLE in "${ROLES[@]}"; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
