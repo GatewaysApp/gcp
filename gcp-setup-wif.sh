@@ -140,6 +140,17 @@ done
 echo "✅ Roles granted"
 echo ""
 
+# Cloud Functions 2nd gen uses Cloud Build; the build service account needs roles/cloudbuild.builds.builder
+# See: https://cloud.google.com/functions/docs/troubleshooting#build-service-account
+echo "🔨 Configuring Cloud Build service account (required for Cloud Functions 2nd gen)..."
+DEFAULT_COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$DEFAULT_COMPUTE_SA" \
+  --role="roles/cloudbuild.builds.builder" \
+  --quiet 2>/dev/null || true
+echo "✅ Cloud Build permissions configured"
+echo ""
+
 # Create workload identity pool
 echo "🏊 Creating Workload Identity Pool..."
 if gcloud iam workload-identity-pools describe "$POOL_ID" --location=global --project="$PROJECT_ID" &>/dev/null; then
