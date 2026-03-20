@@ -101,6 +101,9 @@ for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com c
 done
 echo ""
 
+# Brief pause so newly enabled APIs (e.g. Certificate Manager) are ready for IAM role grants
+sleep 5
+
 # Create or reuse service account
 if gcloud iam service-accounts describe "$SERVICE_ACCOUNT_ID@$PROJECT_ID.iam.gserviceaccount.com" &>/dev/null; then
   echo "⚠️  Service account exists. Reusing..."
@@ -136,10 +139,19 @@ for ROLE in "${ROLES[@]}"; do
   if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
     --role="$ROLE" \
-    --quiet 2>/dev/null; then
+    --quiet; then
     echo "  ✅ $ROLE"
   else
-    echo "  ⚠️  $ROLE (run manually if needed)"
+    echo "  ⚠️  $ROLE failed, retrying in 3s..."
+    sleep 3
+    if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+      --member="serviceAccount:$SERVICE_ACCOUNT_EMAIL" \
+      --role="$ROLE" \
+      --quiet; then
+      echo "  ✅ $ROLE (on retry)"
+    else
+      echo "  ❌ $ROLE - run manually: gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$SERVICE_ACCOUNT_EMAIL --role=$ROLE"
+    fi
   fi
 done
 echo "✅ Roles granted"
