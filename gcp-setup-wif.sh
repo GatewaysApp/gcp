@@ -133,7 +133,7 @@ ROLES=(
   "roles/run.admin"
   "roles/secretmanager.admin"
   "roles/redis.admin"
-  "roles/certificatemanager.admin"
+  "roles/certificatemanager.editor"
 )
 for ROLE in "${ROLES[@]}"; do
   if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
