@@ -92,7 +92,7 @@ echo ""
 
 # Enable APIs
 echo "🔌 Enabling APIs..."
-for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com servicenetworking.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com certificatemanager.googleapis.com; do
+for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com servicenetworking.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com certificatemanager.googleapis.com vpcaccess.googleapis.com; do
   if gcloud services enable "$API" --project="$PROJECT_ID" 2>/dev/null; then
     echo "  ✅ $API"
   else
@@ -135,6 +135,9 @@ else
 fi
 echo ""
 
+# Note: Serverless VPC Access connectors are created on-demand by Gateways when you connect
+# a function to a database (any region). No need to pre-create them here.
+
 # Create or reuse service account
 if gcloud iam service-accounts describe "$SERVICE_ACCOUNT_ID@$PROJECT_ID.iam.gserviceaccount.com" &>/dev/null; then
   echo "⚠️  Service account exists. Reusing..."
@@ -159,6 +162,7 @@ ROLES=(
   "roles/iam.serviceAccountAdmin"
   "roles/iam.serviceAccountUser"
   "roles/compute.networkAdmin"
+  "roles/vpcaccess.admin"
   "roles/viewer"
   "roles/dns.admin"
   "roles/cloudfunctions.admin"
