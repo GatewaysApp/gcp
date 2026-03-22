@@ -92,7 +92,7 @@ echo ""
 
 # Enable APIs
 echo "🔌 Enabling APIs..."
-for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com certificatemanager.googleapis.com; do
+for API in iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com compute.googleapis.com storage.googleapis.com sqladmin.googleapis.com servicenetworking.googleapis.com dns.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com run.googleapis.com secretmanager.googleapis.com redis.googleapis.com certificatemanager.googleapis.com; do
   if gcloud services enable "$API" --project="$PROJECT_ID" 2>/dev/null; then
     echo "  ✅ $API"
   else
@@ -103,6 +103,37 @@ echo ""
 
 # Brief pause so newly enabled APIs (e.g. Certificate Manager) are ready for IAM role grants
 sleep 5
+
+# Configure private services access for Cloud SQL private IP (required when publiclyAccessible=false)
+# See: https://cloud.google.com/sql/docs/mysql/configure-private-ip
+echo "🔗 Configuring private services access (Cloud SQL private IP)..."
+PEERING_RANGE_NAME="gateways-google-managed-services-default"
+if gcloud compute addresses describe "$PEERING_RANGE_NAME" --global --project="$PROJECT_ID" &>/dev/null; then
+  echo "  IP range $PEERING_RANGE_NAME already exists"
+else
+  if gcloud compute addresses create "$PEERING_RANGE_NAME" \
+    --global \
+    --purpose=VPC_PEERING \
+    --prefix-length=16 \
+    --network=default \
+    --project="$PROJECT_ID" 2>/dev/null; then
+    echo "  ✅ Allocated IP range for private services"
+  else
+    echo "  ⚠️  Could not allocate IP range (may need roles/compute.networkAdmin). Run manually:"
+    echo "     gcloud compute addresses create $PEERING_RANGE_NAME --global --purpose=VPC_PEERING --prefix-length=16 --network=default --project=$PROJECT_ID"
+  fi
+fi
+if gcloud services vpc-peerings connect \
+  --service=servicenetworking.googleapis.com \
+  --network=default \
+  --ranges="$PEERING_RANGE_NAME" \
+  --project="$PROJECT_ID" 2>/dev/null; then
+  echo "  ✅ Private service connection created/updated"
+else
+  echo "  ⚠️  VPC peering may already exist or need roles/servicenetworking.networksAdmin"
+  echo "     Manual: gcloud services vpc-peerings connect --service=servicenetworking.googleapis.com --network=default --ranges=$PEERING_RANGE_NAME --project=$PROJECT_ID"
+fi
+echo ""
 
 # Create or reuse service account
 if gcloud iam service-accounts describe "$SERVICE_ACCOUNT_ID@$PROJECT_ID.iam.gserviceaccount.com" &>/dev/null; then
